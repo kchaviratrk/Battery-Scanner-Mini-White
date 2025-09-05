@@ -1,13 +1,16 @@
 """
-Main BLE scanner module for nRF52DK
-Orchestrates BLE device scanning and battery data extraction
+BLE Battery Scanner for nRF52DK
+Main application for scanning and evaluating CR2032 batteries in BLE devices
+Windows optimized version for c:/Battery-Scanner-Mini-White
 """
 import logging
 import time
 import signal
 import sys
+import os
 from typing import List, Dict
 from threading import Event
+from pathlib import Path
 
 from config import config
 from scanner.driver import BLEDriverManager
@@ -15,51 +18,54 @@ from scanner.observer import BLEScannerObserver
 from scanner.results import ResultsManager
 
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, config.LOG_LEVEL.upper()),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler('ble_scanner.log')
-    ]
-)
+def setup_logging():
+    """Configure logging for Windows deployment"""
+    log_dir = Path("c:/Battery-Scanner-Mini-White/logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    
+    logging.basicConfig(
+        level=getattr(logging, config.LOG_LEVEL.upper()),
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler(log_dir / 'scanner.log')
+        ]
+    )
+
 
 logger = logging.getLogger(__name__)
 
 
 class BLEBatteryScanner:
-    """
-    scanner principal for detect devices BLE y extraer battery voltage
-    """
+    """Main BLE scanner for CR2032 battery monitoring"""
     
     def __init__(self):
-        """Inicializa el scanner BLE"""
+        """Initialize the BLE scanner"""
         self.driver_manager: BLEDriverManager = None
         self.observer: BLEScannerObserver = None
         self.results_manager: ResultsManager = None
         self.scan_complete_event = Event()
         self.running = True
         
-        # withfigure manejo de señales for cierre limpio
+        # Setup signal handlers for clean shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
     
     def _signal_handler(self, signum, frame):
-        """Maneja señales for cierre limpio"""
-        logger.info(f"Señal {signum} recibida, cerrando application...")
+        """Handle shutdown signals"""
+        logger.info(f"Signal {signum} received, shutting down...")
         self.running = False
         self.scan_complete_event.set()
     
     def initialize(self) -> bool:
-        """
-        Initialize all scanner components
-        
-        Returns:
-            True si la inicialización fue successful
-        """
+        """Initialize all scanner components"""
         try:
-            logger.info("Initializing BLE scanner")
+            logger.info("Initializing BLE Scanner for CR2032 battery monitoring")
+            logger.info(f"Target location: c:/Battery-Scanner-Mini-White")
+            
+            # Create results directory
+            results_dir = Path("c:/Battery-Scanner-Mini-White/results")
+            results_dir.mkdir(parents=True, exist_ok=True)
             
             # Initialize driver
             self.driver_manager = BLEDriverManager(config.COM_PORT)
@@ -87,88 +93,73 @@ class BLEBatteryScanner:
             return True
             
         except Exception as e:
-            logger.error(f"Error initializing scanner: {e}")
+            logger.error(f"Failed to initialize scanner: {e}")
             return False
     
     def _on_scan_complete(self):
-        """Callback called when scan completes"""
-        logger.info("Scan completed, all MACs processed")
+        """Callback when scan completes"""
+        logger.info("Scan completed - all target devices processed")
         self.scan_complete_event.set()
     
     def start_scan(self, mac_list: List[str]) -> List[Dict]:
-        """
-        Starts BLE scan for specified MAC list
-        
-        Args:
-            mac_list: List of MAC addresses to search
-            
-        Returns:
-            List of scan results
-        """
+        """Start BLE scan for specified MAC addresses"""
         try:
             if not self.running:
                 return []
             
-            logger.info(f"Starting scan for {len(mac_list)} devices")
+            logger.info(f"Starting scan for {len(mac_list)} target devices")
             
             # Reset observer with new MAC list
             self.observer.reset_scan(mac_list)
             self.scan_complete_event.clear()
             
-            # Start scan
+            # Start scanning
             self.driver_manager.start_scan()
             
-            # Wait for configured time or until complete
+            # Wait for scan completion or timeout
             logger.info(f"Scanning for {config.SCAN_TIME} seconds...")
             
-            scan_timeout = False
             if self.scan_complete_event.wait(timeout=config.SCAN_TIME):
-                logger.info("Scan completed by detecting all MACs")
+                logger.info("Scan completed - all devices found")
             else:
-                logger.info("Scan time expired")
-                scan_timeout = True
+                logger.info("Scan timeout reached")
             
-            # Stop scan
+            # Stop scanning
             self.driver_manager.stop_scan()
             
             # Get results
             results = self.observer.get_scan_results()
             pending_macs = self.observer.get_pending_macs()
             
-            if pending_macs and scan_timeout:
-                logger.warning(f"MACs not found: {pending_macs}")
+            if pending_macs:
+                logger.warning(f"Devices not found: {pending_macs}")
             
             logger.info(f"Scan finished. Devices processed: {len(results)}")
             return results
             
         except Exception as e:
-            logger.error(f"Error during scan: {e}")
+            logger.error(f"Error during scanning: {e}")
             return []
     
     def run_full_scan(self) -> bool:
-        """
-        Execute a complete scan of all configured devices
-        
-        Returns:
-            True if scan completed successfully
-        """
+        """Execute complete scan of all configured devices"""
         try:
             if not self.initialize():
                 return False
             
-            # Get list of MACs to scan
+            # Get target MAC list
             mac_list = config.VALID_MAC_IDS.copy()
             all_results = []
             
-            logger.info(f"Starting full scan of {len(mac_list)} devices")
+            logger.info(f"Starting full scan of {len(mac_list)} target devices")
             
-            # Execute scans until all MACs are processed
-            max_iterations = 5  # Limit iterations to avoid infinite loops
+            # Execute scans with retry logic
+            max_iterations = 3
             iteration = 0
             
             while mac_list and self.running and iteration < max_iterations:
                 iteration += 1
-                logger.info(f"Iteration {iteration}: scanning {len(mac_list)} pending devices")
+                logger.info(f"Scan iteration {iteration}: {len(mac_list)} devices remaining")
                 
                 # Perform scan
                 scan_results = self.start_scan(mac_list)
@@ -180,25 +171,22 @@ class BLEBatteryScanner:
                     processed_macs = {result['macid'] for result in scan_results}
                     mac_list = [mac for mac in mac_list if mac not in processed_macs]
                     
-                    logger.info(f"Processed {len(scan_results)} devices. Pending: {len(mac_list)}")
-                else:
-                    logger.warning("No results obtained in this iteration")
+                    logger.info(f"Processed {len(scan_results)} devices. Remaining: {len(mac_list)}")
                 
-                # Pause between iterations if devices remain
+                # Brief pause between iterations
                 if mac_list and self.running:
-                    logger.info("Waiting before next iteration...")
                     time.sleep(2)
             
-            # Save all results
+            # Save results
             if all_results:
                 success_json, success_csv = self.results_manager.save_results(all_results)
                 
                 if success_json and success_csv:
-                    logger.info("Results saved successfully")
+                    logger.info("Results saved successfully to c:/Battery-Scanner-Mini-White/results/")
                 else:
-                    logger.warning("Some files could not be saved")
+                    logger.warning("Some result files could not be saved")
                 
-                # Show summary
+                # Display summary
                 self.results_manager.print_summary(all_results)
                 
                 return True
@@ -227,20 +215,23 @@ class BLEBatteryScanner:
 
 
 def main():
-    """Main program function"""
+    """Main application entry point"""
     try:
-        logger.info("=== STARTING BLE SCANNER FOR BATTERIES ===")
-        logger.info(f"COM port: {config.COM_PORT}")
-        logger.info(f"Battery threshold: {config.BATTERY_THRESHOLD} mV")
-        logger.info(f"Scan time: {config.SCAN_TIME} seconds")
-        logger.info(f"Valid MACs: {len(config.VALID_MAC_IDS)}")
+        setup_logging()
         
-        # Create and execute scanner
+        logger.info("=== BLE SCANNER FOR CR2032 BATTERY MONITORING ===")
+        logger.info("Windows optimized version for c:/Battery-Scanner-Mini-White")
+        logger.info(f"COM port: {config.COM_PORT}")
+        logger.info(f"Scan duration: {config.SCAN_TIME} seconds")
+        logger.info(f"Target devices: {len(config.VALID_MAC_IDS)}")
+        
+        # Create and run scanner
         scanner = BLEBatteryScanner()
         success = scanner.run_full_scan()
         
         if success:
             logger.info("=== SCAN COMPLETED SUCCESSFULLY ===")
+            print("\n✅ Results saved to c:/Battery-Scanner-Mini-White/results/")
             sys.exit(0)
         else:
             logger.error("=== SCAN FAILED ===")
