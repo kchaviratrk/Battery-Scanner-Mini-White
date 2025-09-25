@@ -3,11 +3,21 @@ BLE Battery Scanner - Simplified and Unified Version
 Universal scanner for CR2032 in BLE devices using Nordic nRF52DK
 No differences between device types - unified protocol
 """
-import os
-import sys
 
 # Environment validation before any other imports
+import os
+import sys
 import logging
+import pc_ble_driver_py.config as pc_config
+import time
+import json
+import csv
+import requests
+
+# Set Nordic driver environment after validation - use SD API v5
+os.environ['__conn_ic_id__'] = 'NRF52'
+os.environ['SD_API_VER'] = '5'
+pc_config.__conn_ic_id__ = 'NRF52'
 
 def check_python_version():
     """Check if Python version is compatible with pc-ble-driver-py."""
@@ -63,21 +73,6 @@ def validate_environment():
 # Run validation before any other imports
 validate_environment()
 
-# Set Nordic driver environment after validation - use SD API v5
-os.environ['__conn_ic_id__'] = 'NRF52'
-os.environ['SD_API_VER'] = '5'
-
-import pc_ble_driver_py.config as pc_config
-pc_config.__conn_ic_id__ = 'NRF52'
-
-import logging
-import time
-import signal
-import sys
-import pytz
-import requests
-import json
-import csv
 from collections import deque
 from time import perf_counter
 from typing import List, Dict
@@ -87,7 +82,15 @@ from pc_ble_driver_py.ble_driver import BLEDriver, BLEEnableParams, BLEGapScanPa
 from pc_ble_driver_py.observers import BLEDriverObserver
 from datetime import datetime, timezone as dt_timezone, timedelta
 from pytz import timezone as pytz_timezone, utc
-from colorama import init
+# Optional colorama: define init() regardless of availability
+try:
+    from colorama import init as _colorama_init
+except Exception:
+    def _colorama_init():
+        pass
+# Provide a global init symbol used later in the code
+init = _colorama_init
+init()
 
 from config import config
 from utils.ports import get_com_port

@@ -1,7 +1,7 @@
 # Simplified requirements for Universal BLE Scanner
 # Compatible with SD API v5 (pc-ble-driver-py 0.16.x)
 
-pc-ble-driver-py==0.16.0
+pc-ble-driver-py==0.16.4
 termcolor==2.3.0
 colorama==0.4.6
 pyserial==3.5
