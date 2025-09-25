@@ -1,55 +1,122 @@
-# BLE Scanner for CR2032 Battery Monitoring
+# BLE Universal Scanner (simplified version)
 
-**Windows optimized BLE scanner for c:/Battery-Scanner-Mini-White deployment**
+Universal BLE scanner to check CR2032 battery status on BLE devices using an nRF52DK (Windows).
 
-## 🎯 Purpose
+Summary
+-------
+This repository provides a Windows command-line tool that performs universal BLE scans and evaluates CR2032 battery voltage from devices advertising battery data. The project now supports batch processing, a double-scan workflow (pre-test and post-test), environment validation for Python and pc-ble-driver-py, and structured JSON/CSV output including diagnostics and metrics.
 
-Monitor CR2032 battery health in BLE devices using Nordic nRF52DK development kit.
+Key features
+------------
+- Universal protocol parsing for multiple advertising formats.
+- Batch input: load up to N QR codes/MACs (configurable, default 50) from a file or manual entry.
+- Concurrent batch scan: single scan session that searches for all targets and records results.
+- Double-scan workflow (pre-test and post-test) with operator confirmation.
+- Delta evaluation: compare pre and post voltages and mark failures when voltage drop exceeds a configurable threshold.
+- Environment validation: Python version check and pc-ble-driver-py compatibility check before starting.
+- Results exported to JSON and CSV with metrics (total, processed, failed, elapsed time).
 
-## 🚀 Quick Start
+Requirements
+------------
+- Windows (batch menu and default paths are Windows-focused)
+- Python 3.7 to 3.10 (Python 3.11 and higher is not supported by pc-ble-driver-py in this project)
+- nRF52DK connected to the PC COM port
+- pc-ble-driver-py installed and compatible with the target firmware
 
-1. **Install Python 3.7+** from [python.org](https://python.org)
-2. **Connect nRF52DK** to USB port
-3. **Run:** `run_scanner.bat`
-4. **Select:** Option 1 (System Check)
-5. **Select:** Option 2 (Install Dependencies)
-6. **Configure:** Option 5 (Edit COM port)
-7. **Scan:** Option 3 (Run Scanner)
+Installation (Windows)
+----------------------
+1. Install Python 3.7-3.10 (recommended: 3.10.11). Do not use Python 3.11+.
+2. Open Command Prompt with appropriate permissions.
+3. From the project folder run:
+   python -m pip install --upgrade pip
+   python -m pip install -r requirements.txt
+4. Connect the nRF52DK by USB and note the COM port in Device Manager.
 
-## 🔋 Battery Categories
+Environment validation
+----------------------
+Before starting the scanner the tool runs environment checks:
+- Python version: must be < 3.11 and >= 3.7. If Python 3.11+ is detected the program exits with a clear error and instructions.
+- pc-ble-driver-py: the installed version is checked and compared against the compatibility mapping in `config.py` (PC_BLE_DRIVER_COMPAT). If there is an incompatibility the scanner reports the mismatch and suggests a reinstall command.
 
-- 🟢 **NEW** (3000-3300mV): Fresh battery
-- 🟡 **OK** (2850-2999mV): Good condition
-- 🟠 **LOW** (2750-2849mV): Replace soon
-- 🔴 **DEAD** (≤2750mV): Replace immediately
+Configuration
+-------------
+Primary settings are in `config.py` (ScannerConfig):
+- COM_PORT: primary nRF52DK COM port (e.g. "COM17")
+- COM_PORT_BACKUP: backup COM port
+- MAX_QR_BATCH: maximum number of QR codes/MACs per batch (default 50)
+- QR_INPUT_FILE: default input file (default "qrcodes.txt")
+- POST_TEST_ENABLED: enable or disable post-test confirmation (default False)
+- SCAN_TIME: duration (s) for each scan phase (pre/post) when used
+- SCAN_TIMEOUT: timeout used for scanning calculations
+- BATTERY_THRESHOLD: voltage in V considered good (e.g. 2.90)
+- RSSI_THRESHOLD: RSSI threshold in dBm
+- DELTA_VOLTAGE_FAIL: voltage drop in mV considered a FAIL in post-test (default 100)
+- SUPPORTED_PYTHON_VERSION: recommended Python version string (e.g. "3.10.11")
+- PC_BLE_DRIVER_COMPAT: mapping of pc-ble-driver-py versions to required firmware strings
 
-## 📁 Files
+Usage
+-----
+1. Run `run_scanner.bat` and select the option to run the scanner, or run directly:
+   python ble_scanner.py
+2. Choose input mode when prompted:
+   - file: load QR codes / MACs from a text or CSV file (one entry per line, first CSV column accepted). Default file is `qrcodes.txt`.
+   - manual: paste a comma-separated list of QR codes or MAC addresses.
+3. The tool resolves QR codes to MAC addresses via the configured backend endpoint, deduplicates entries and limits the batch to `MAX_QR_BATCH`.
+4. The scanner runs the pre-test scan for the entire batch. When pre-test completes the terminal will show a message:
 
-- `ble_scanner.py` - Main application
-- `config.py` - Settings (edit COM port here)
-- `run_scanner.bat` - Windows menu system
-- `scanner/` - Core modules
+Pre-test complete. Place units in chamber. Press ENTER when ready for post-test.
 
-## 📊 Results
+5. After the operator presses ENTER, the post-test scan runs for the same batch and the tool produces a combined report comparing pre and post results.
 
-All output saved to `c:/Battery-Scanner-Mini-White/`:
-- `results/battery_results.json` - Detailed data
-- `results/battery_results.csv` - Excel format
-- `logs/scanner.log` - Technical logs
+Double-scan details
+-------------------
+- Each unit is recorded with pre-test and post-test readings: voltage (mV), RSSI, timestamp and PASS/FAIL status.
+- Delta voltage is calculated as post.voltage_mv - pre.voltage_mv (negative if voltage dropped).
+- If the voltage drop magnitude exceeds `DELTA_VOLTAGE_FAIL` the unit is marked as FAIL in the final status.
 
-## 🔧 Configuration
+Output and reporting
+--------------------
+- JSON: `c:/Battery-Scanner-Mini-White/results/scan_results.json` contains an object with `metrics` and `results`. Each result includes `pre_test`, `post_test`, `delta_voltage`, and `final_status`.
+- CSV: `c:/Battery-Scanner-Mini-White/results/scan_results.csv` contains rows for each unit with columns for pre/post voltage, RSSI, timestamps, delta and final status.
+- Terminal: progress messages during scanning and a final summary with totals.
 
-Edit `config.py`:
-```python
-COM_PORT = "COM3"  # Change to your nRF52DK port
-VALID_MAC_IDS = ["A1B2C3D4E5F6"]  # Add your device MACs
-```
+Example terminal output (plain text)
+------------------------------------
+[PRE-TEST]  A1:B2:C3:D4:E5:F6 -> 3100 mV, PASS
+[PRE-TEST]  11:22:33:44:55:66 -> 2800 mV, FAIL
 
-## 💡 Troubleshooting
+Pre-test complete. Place units in chamber. Press ENTER when ready for post-test.
 
-- **Python error:** Install from python.org, check PATH
-- **COM port error:** Check Device Manager, update config.py
-- **No devices:** Ensure devices powered on, within 2m range
+[POST-TEST] A1:B2:C3:D4:E5:F6 -> 3050 mV, PASS (Δ -50 mV)
+[POST-TEST] 11:22:33:44:55:66 -> 2700 mV, FAIL (Δ -100 mV)
+
+SUMMARY:
+Total Units: 2
+Pass: 1
+Fail: 1
+
+Files of interest
+-----------------
+- `ble_scanner.py` — main scanner, batch and double-scan logic, environment validation
+- `config.py` — configuration including compatibility mapping
+- `battery_evaluator.py` — CR2032 battery classification logic
+- `run_scanner.bat` — Windows menu to run checks and scanner
+- `requirements.txt` — required Python packages
+- `test_system.py` — validation tests (may require adjustments after refactor)
+
+Troubleshooting
+---------------
+- If Python 3.11+ is installed, install Python 3.10.x and run the scanner with that interpreter.
+- If pc-ble-driver-py version is incompatible, reinstall a compatible version using the suggested pip command shown by the environment checker.
+- If no devices are detected, verify hardware connections, drivers, COM port and that units are powered and within range.
+
+Contributing and license
+------------------------
+Add a LICENSE file and contribution guidelines if the project will be shared or accept external contributions.
+
+Contact
+-------
+Open an issue in the repository for questions or report bugs.
 
 ---
-**Target:** `c:/Battery-Scanner-Mini-White/` | **Language:** English | **Platform:** Windows
+Version: simplified — updated with batch processing and double-scan workflow.

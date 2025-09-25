@@ -1,49 +1,56 @@
-"""
-BLE Scanner Configuration for nRF52DK
-Windows optimized configuration for CR2032 battery monitoring
-"""
-from dataclasses import dataclass
-from typing import List
-
+# Configuration for BLE Scanner - Simplified Version
+from dataclasses import dataclass, field
+from typing import List, Dict
 
 @dataclass
 class ScannerConfig:
-    """BLE Scanner Configuration for Windows"""
+    """Simplified configuration for the universal BLE scanner"""
     
-    # ========== HARDWARE CONFIGURATION ==========
-    COM_PORT: str = "COM3"  # nRF52DK COM port (check Device Manager)
+    # COM port configuration (used as fallback if auto-detection fails)
+    COM_PORT: str = "COM6"  # Main port
+    COM_PORT_BACKUP: str = "COM7"  # Backup port
+    AUTO_DETECT_COM: bool = True  # Enable automatic COM detection for nRF52DK
     
-    # ========== SCAN PARAMETERS ==========
-    SCAN_TIME: int = 10     # Scan duration in seconds
-    BATTERY_THRESHOLD: int = 2850  # Minimum operational voltage (mV)
+    # Scan parameters
+    SCAN_TIMEOUT: int = 30  # Legacy per-device timeout (not used in auto mode)
+    SCAN_TIME: int = 120  # Fixed discovery or phase duration in seconds
+    BATTERY_THRESHOLD: float = 2.90  # Minimum battery voltage (V)
+    RSSI_THRESHOLD: int = -200  # Minimum RSSI (dBm) - Capture all devices
+
+    # Distance-based filtering (approximate RSSI thresholds)
+    RSSI_DISTANCE_THRESHOLDS: Dict[str, int] = field(default_factory=lambda: {
+        "1m": -45,    # ~1 meter range
+        "2m": -55,    # ~2 meters range  
+        "3m": -65,    # ~3 meters range
+        "5m": -75,    # ~5 meters range
+        "10m": -85    # ~10+ meters range
+    })
     
-    # Target device MAC addresses (format: "AABBCCDDEEFF")
-    VALID_MAC_IDS: List[str] = [
-        "A1B2C3D4E5F6",
-        "112233445566", 
-        "AABBCCDDEEFF",
-        "123456789ABC"
-    ]
+    # Batch processing
+    POST_TEST_ENABLED: bool = False  # Operator-confirmed post-test disabled in auto mode
+    MAX_QR_BATCH: int = 30000  # Max devices per batch  
+    QR_INPUT_FILE: str = "qrcodes.txt"
     
-    # ========== OUTPUT CONFIGURATION ==========
-    OUTPUT_JSON_FILE: str = "c:/Battery-Scanner-Mini-White/results/battery_results.json"
-    OUTPUT_CSV_FILE: str = "c:/Battery-Scanner-Mini-White/results/battery_results.csv"
+    # Delta evaluation
+    DELTA_VOLTAGE_FAIL: int = 100  # mV drop considered FAIL in post-test
+    
+    # Environment validation
+    SUPPORTED_PYTHON_VERSION: str = "3.10.11"
+    PC_BLE_DRIVER_COMPAT: Dict[str, str] = field(default_factory=lambda: {
+        "0.11": "FW v3",
+        "0.16": "FW v5",
+        "0.17": "FW v5"
+    })
+    
+    # Logging configuration
     LOG_LEVEL: str = "INFO"
     
-    # ========== CR2032 BATTERY THRESHOLDS ==========
-    CR2032_NEW_MIN: int = 3000      # 3.0V - Fresh battery
-    CR2032_NEW_MAX: int = 3300      # 3.3V - Maximum voltage
-    CR2032_OPERATIONAL: int = 2850  # 2.85V - Good working condition
-    CR2032_LOW_BATTERY: int = 2750  # 2.75V - Replace soon
-    CR2032_DEAD_BATTERY: int = 2750 # ≤2.75V - Replace immediately
+    # Output files (Windows paths)
+    OUTPUT_JSON_FILE: str = "c:/Battery-Scanner-Mini-White/results/scan_results.json"
+    OUTPUT_CSV_FILE: str = "c:/Battery-Scanner-Mini-White/results/scan_results.csv"
     
-    # ========== EVALUATION SETTINGS ==========
-    USE_CR2032_EVALUATION: bool = True    # Enable CR2032 specific analysis
-    INCLUDE_BATTERY_ADVICE: bool = True   # Include maintenance advice
-    INCLUDE_LIFE_ESTIMATE: bool = True    # Predict remaining life
-    CONSIDER_PULSE_LOAD: bool = True      # Compensate for voltage drops
-    PULSE_LOAD_COMPENSATION: int = 50     # Load compensation (mV)
+    # Valid MACs (empty list = accept any MAC)
+    VALID_MAC_IDS: List[str] = field(default_factory=list)
 
-
-# Global configuration instance
+# Configuration instance
 config = ScannerConfig()

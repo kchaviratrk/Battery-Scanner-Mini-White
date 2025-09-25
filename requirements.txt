@@ -1,14 +1,26 @@
-# BLE Scanner for nRF52DK - Windows Dependencies
-# Optimized for c:/Battery-Scanner-Mini-White deployment
+# Simplified requirements for Universal BLE Scanner
+# Clean version without unnecessary dependencies
 
-# Nordic Semiconductor Python driver (CRITICAL)
-# Compatible with Python 3.7+ on Windows
-pc-ble-driver-py>=0.17.0
+# Nordic BLE Driver
+pc-ble-driver-py==0.11.4
 
-# Data processing libraries
-pandas>=1.5.0
-numpy>=1.21.0
+# Terminal UI and colors
+echo "Note: termcolor optional" # ...existing code...
+termcolor==2.3.0
+colorama==0.4.6
 
-# Built-in modules (no installation required):
-# - logging, datetime, pathlib, json, csv
-# - typing, os, sys, signal, threading
+# Serial port detection (Windows)
+pyserial==3.5
+
+# HTTP requests for APIs
+requests==2.31.0
+
+# Timezone handling
+pytz==2023.3
+
+# .env support
+python-dotenv==1.0.0
+
+# Logging and system
+# pathlib  # stdlib in Py3
+# typing   # stdlib in Py3
