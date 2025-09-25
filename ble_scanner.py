@@ -94,7 +94,9 @@ init()
 
 from config import config
 from utils.ports import get_com_port
-from utils.telemetry import send_batch_summary, post_manuf_event, load_env
+from utils.telemetry import send_batch_summary, send_batch_csv_details, post_manuf_event, load_env
+# Add CSV detail sender
+from utils.telemetry import send_batch_csv_details
 import uuid
 
 # Simplified configuration
@@ -1166,8 +1168,11 @@ def main():
                     print(f"Posted batch summary event (HTTP {status})")
                 else:
                     print("Failed to post batch summary event")
+                # Additionally, send CSV details in parts so each device row is stored in DB
+                parts = send_batch_csv_details(csv_path=config.OUTPUT_CSV_FILE, run_id=run_id, per_row=True)
+                print(f"Posted {parts} CSV detail event(s)")
             except Exception as e:
-                print(f"Error sending batch summary: {e}")
+                print(f"Error sending batch summary/details: {e}")
     except KeyboardInterrupt:
         print("Interrupted by user")
     except Exception as e:
