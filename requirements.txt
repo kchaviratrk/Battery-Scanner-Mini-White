@@ -1,26 +1,10 @@
 # Simplified requirements for Universal BLE Scanner
-# Clean version without unnecessary dependencies
+# Compatible with SD API v5 (pc-ble-driver-py 0.16.x)
 
-# Nordic BLE Driver
-pc-ble-driver-py==0.11.4
-
-# Terminal UI and colors
-echo "Note: termcolor optional" # ...existing code...
+pc-ble-driver-py==0.16.0
 termcolor==2.3.0
 colorama==0.4.6
-
-# Serial port detection (Windows)
 pyserial==3.5
-
-# HTTP requests for APIs
 requests==2.31.0
-
-# Timezone handling
 pytz==2023.3
-
-# .env support
 python-dotenv==1.0.0
-
-# Logging and system
-# pathlib  # stdlib in Py3
-# typing   # stdlib in Py3
