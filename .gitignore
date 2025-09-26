@@ -2,3 +2,5 @@
 /results
 /results
 results/scan_results.csv
+.env
+results/scan_results.csv
